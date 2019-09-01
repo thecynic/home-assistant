@@ -45,6 +45,8 @@ class LutronLight(LutronDevice, Light):
     def brightness(self):
         """Return the brightness of the light."""
         new_brightness = to_hass_level(self._lutron_device.last_level())
+        _LOGGER.debug('Getting brightness: %d (prev %d) @ %s' % (
+                new_brightness, self._prev_brightness, self._lutron_device))
         if new_brightness != 0:
             self._prev_brightness = new_brightness
         return new_brightness
@@ -53,16 +55,29 @@ class LutronLight(LutronDevice, Light):
         """Turn the light on."""
         if ATTR_BRIGHTNESS in kwargs and self._lutron_device.is_dimmable:
             brightness = kwargs[ATTR_BRIGHTNESS]
+            source = "attrs"
         elif self._prev_brightness == 0:
             brightness = 255 / 2
+            source = "default"
         else:
             brightness = self._prev_brightness
+            source = "previous"
+        _LOGGER.debug('Turning on: brightness: %d (prev %d source %s) @ %s' % (
+                brightness, self._prev_brightness, source, self._lutron_device))
         self._prev_brightness = brightness
+        _LOGGER.debug("In on: set prev %d @ %s" % (
+                self._prev_brightness, self._lutron_device))
         self._lutron_device.level = to_lutron_level(brightness)
+        _LOGGER.debug('Turned on: brightness: %d (prev %d source %s) @ %s' % (
+                to_hass_level(self._lutron_device.last_level()), self._prev_brightness, source, self._lutron_device))
 
     def turn_off(self, **kwargs):
         """Turn the light off."""
+        _LOGGER.debug("Turning off (prev %d) @ %s" % (
+                self._prev_brightness, self._lutron_device))
         self._lutron_device.level = 0
+        _LOGGER.debug("Turned off (prev %d) @ %s" % (
+                self._prev_brightness, self._lutron_device))
 
     @property
     def device_state_attributes(self):
@@ -73,9 +88,17 @@ class LutronLight(LutronDevice, Light):
     @property
     def is_on(self):
         """Return true if device is on."""
+        last = self._lutron_device.last_level()
+        _LOGGER.debug("Checking on state: on %s last %f prev %d @ %s" % (
+                last > 0, last, self._prev_brightness, self._lutron_device))
         return self._lutron_device.last_level() > 0
 
     def update(self):
         """Call when forcing a refresh of the device."""
         if self._prev_brightness is None:
             self._prev_brightness = to_hass_level(self._lutron_device.level)
+            _LOGGER.debug("In update: setting prev %d @ %s" % (
+                    self._prev_brightness, self._lutron_device))
+        else:
+            _LOGGER.debug("In update: prev %d @ %s" % (
+                    self._prev_brightness, self._lutron_device))
